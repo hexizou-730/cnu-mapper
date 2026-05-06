@@ -33,9 +33,12 @@ llm_classifier.py
 dewey_to_cnu.py
 label_theses.py
 fetch_theses.py
-cnu_knowledge_base_v2.json
 cnu_knowledge_base_official.json
 ```
+
+`ddc_classifier.py` and `llm_classifier.py` read the official CNU knowledge
+base for section codes and French names. English display names are maintained
+in `dewey_to_cnu.py`.
 
 Generated local files:
 

@@ -24,11 +24,9 @@ cnu_mapper/
 |-- dewey_to_cnu.py                    # Rule-based DDC-to-CNU mapping table
 |-- label_theses.py                    # Build labeled training data from raw.csv
 |-- fetch_theses.py                    # Download / inspect / filter theses.fr data
-|-- cnu_knowledge_base_v2.json         # Enriched runtime CNU knowledge base
-|-- cnu_knowledge_base_official.json   # Official CNU reference data
+|-- cnu_knowledge_base_official.json   # Official CNU reference used by DDC and LLM output
 |-- DATA_PROVENANCE.md                 # Data source notes
-|-- USAGE_GUIDE.md                     # Detailed usage guide
-`-- old_baseline/                      # Archived earlier baseline and diagnostics
+`-- USAGE_GUIDE.md                     # Detailed usage guide
 ```
 
 Large local artifacts are intentionally ignored by Git:
@@ -119,7 +117,7 @@ Decision threshold: 0.xxx
 Description: ...
 Predicted DDC: 004
 Mapped CNU:
-  27  Computer science
+  27  Computer science / Informatique
 ```
 
 ## LLM Usage
@@ -153,6 +151,21 @@ Model    DDC Micro F1   CNU Micro F1   CNU Subset Accuracy
 LogReg   ...
 MLP      ...
 ```
+
+Latest full 80/20 evaluation on `theses_labeled.csv`:
+
+| Model | DDC Micro F1 | CNU Micro F1 | CNU Subset Accuracy |
+|---|---:|---:|---:|
+| LogReg | 0.6270 | 0.6650 | 60.05% |
+| MLP | 0.5225 | 0.5663 | 50.99% |
+
+Evaluation setup:
+
+- Fit split: 212,228 samples
+- Validation split: 53,058 samples
+- Test split: 66,322 samples
+- LogReg calibrated threshold: 0.875
+- MLP calibrated threshold: 0.950
 
 These metrics are used because the task is multi-label:
 

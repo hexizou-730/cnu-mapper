@@ -19,5 +19,8 @@ theses_labeled.csv
 *.log
 eval_*.txt
 
+# Archived local baselines
+old_baseline/
+
 # macOS metadata
 .DS_Store

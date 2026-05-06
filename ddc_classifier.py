@@ -48,7 +48,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.exceptions import ConvergenceWarning
 
-from dewey_to_cnu import lookup as ddc_to_cnu
+from dewey_to_cnu import lookup as ddc_to_cnu, section_display_name
 
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -58,7 +58,7 @@ warnings.filterwarnings("ignore", message=r"unknown class\(es\).*")
 # ─────────── Configuration / 配置 ───────────
 HERE = Path(__file__).parent
 TRAIN_CSV = HERE / "theses_labeled.csv"
-KB_PATH = HERE / "cnu_knowledge_base_v2.json"
+KB_PATH = HERE / "cnu_knowledge_base_official.json"
 
 MODEL_PATHS = {
     "logreg": HERE / "ddc_model_logreg.pkl",
@@ -99,7 +99,14 @@ MLP_TFIDF_PARAMS = dict(
 # ─────────── Data / 数据 ───────────
 def load_kb() -> dict[str, str]:
     kb = json.loads(KB_PATH.read_text(encoding="utf-8"))
-    return {s["code_section"]: s["section_en"] for s in kb}
+    sections = kb.get("sections", [])
+    return {
+        s["code_section"]: section_display_name(
+            s["code_section"],
+            s.get("section_fr"),
+        )
+        for s in sections
+    }
 
 
 def load_data(max_samples: int | None = None) -> tuple[list[str], list[list[str]], list[list[str]]]:

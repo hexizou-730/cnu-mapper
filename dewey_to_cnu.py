@@ -42,6 +42,90 @@ CONSEQUENCES / 影响:
 from __future__ import annotations
 
 
+CNU_SECTION_EN: dict[str, str] = {
+    "01": "Private law and criminal sciences",
+    "02": "Public law",
+    "03": "History of law and institutions",
+    "04": "Political science",
+    "05": "Economics",
+    "06": "Management sciences and management",
+    "07": "Language sciences (linguistics)",
+    "08": "Ancient languages and literatures (Greek, Latin)",
+    "09": "French language and literature",
+    "10": "Comparative literature",
+    "11": "Anglophone studies (English literature and culture)",
+    "12": "Germanic and Scandinavian studies",
+    "13": "Slavic and Baltic studies",
+    "14": "Romance studies (Spanish, Italian, Portuguese, etc.)",
+    "15": "African, Asian and other linguistic area languages, literatures and cultures",
+    "16": "Psychology and ergonomics",
+    "17": "Philosophy",
+    "18": "Architecture, applied arts, visual arts, performing arts, aesthetics, musicology and music",
+    "19": "Sociology and demography",
+    "20": "Ethnology, prehistory and biological anthropology",
+    "21": "History of ancient and medieval worlds, civilisations, archaeology and art",
+    "22": "History of modern and contemporary worlds, art history and music history",
+    "23": "Physical, human, economic and regional geography",
+    "24": "Spatial planning and urban studies",
+    "25": "Mathematics",
+    "26": "Applied mathematics",
+    "27": "Computer science",
+    "28": "Dense media and materials (condensed matter physics)",
+    "29": "Elementary constituents (particle and nuclear physics)",
+    "30": "Dilute media and optics",
+    "31": "Theoretical, physical and analytical chemistry",
+    "32": "Organic, inorganic and industrial chemistry",
+    "33": "Materials chemistry",
+    "34": "Astronomy and astrophysics",
+    "35": "Structure and evolution of the Earth and other planets",
+    "36": "Solid Earth: geodynamics of upper envelopes and palaeobiosphere",
+    "37": "Fluid envelopes of the Earth system and other planets (atmospheric and ocean sciences)",
+    "42": "Morphology and morphogenesis (anatomy and pathological cytology)",
+    "43": "Biophysics and medical imaging",
+    "44": "Biochemistry, cell and molecular biology, physiology and nutrition",
+    "45": "Microbiology, infectious diseases and hygiene",
+    "46": "Public health, environment and society",
+    "47": "Oncology, genetics, haematology and immunology",
+    "48": "Anaesthesiology, intensive care, emergency medicine, pharmacology and therapeutics",
+    "49": "Neurological and muscular pathology, mental disorders, disability and rehabilitation",
+    "50": "Osteoarticular pathology, dermatology and plastic surgery",
+    "51": "Cardiorespiratory and vascular pathology",
+    "52": "Diseases of the digestive and urinary systems",
+    "53": "Internal medicine, geriatrics and general surgery",
+    "54": "Child development and pathology, gynaecology-obstetrics, endocrinology and reproduction",
+    "55": "Head and neck pathology (ENT, ophthalmology)",
+    "56": "Development, growth and prevention (dentistry)",
+    "57": "Oral surgery, periodontology and oral biology",
+    "58": "Oral rehabilitation (prosthetics and restorative dentistry)",
+    "60": "Mechanics, mechanical engineering and civil engineering",
+    "61": "Computer engineering, automation and signal processing",
+    "62": "Energy engineering and process engineering",
+    "63": "Electrical engineering, electronics, photonics and systems",
+    "64": "Biochemistry and molecular biology",
+    "65": "Cell biology",
+    "66": "Physiology",
+    "67": "Population biology and ecology",
+    "68": "Organismal biology",
+    "69": "Neurosciences",
+    "70": "Education sciences and training",
+    "71": "Information and communication sciences",
+    "72": "Epistemology, history of science and technology",
+    "73": "Regional cultures and languages",
+    "74": "Sport sciences and physical activity",
+    "76": "Catholic theology",
+    "77": "Protestant theology",
+    "80": "Physical-chemical sciences and engineering applied to health (pharmacy, bi-membership)",
+    "81": "Pharmaceutical sciences and other health products (bi-membership)",
+    "82": "Biological, fundamental and clinical sciences (pharmacy, bi-membership)",
+    "85": "Physical-chemical sciences and engineering applied to health (pharmacy, mono-membership)",
+    "86": "Pharmaceutical sciences and other health products (mono-membership)",
+    "87": "Biological, fundamental and clinical sciences (pharmacy, mono-membership)",
+    "90": "Midwifery (maieutics)",
+    "91": "Rehabilitation and re-adaptation sciences (physiotherapy, occupational therapy)",
+    "92": "Nursing sciences",
+}
+
+
 DEWEY_TO_CNU: dict[str, list[str]] = {
 
     # ═════════════════ 0xx — Computer science, info, general ═════════════════
@@ -417,6 +501,20 @@ def lookup(ddc: str) -> list[str]:
     """
     ddc = (ddc or "").strip().zfill(3)
     return DEWEY_TO_CNU.get(ddc, [])
+
+
+def section_name_en(cnu_code: str) -> str | None:
+    """Return the project-maintained English display name for a CNU code."""
+    return CNU_SECTION_EN.get((cnu_code or "").strip().zfill(2))
+
+
+def section_display_name(cnu_code: str, section_fr: str | None = None) -> str:
+    """Return a readable English/French display name without modifying official data."""
+    code = (cnu_code or "").strip().zfill(2)
+    section_en = section_name_en(code)
+    if section_en and section_fr:
+        return f"{section_en} / {section_fr}"
+    return section_en or section_fr or "?"
 
 
 def coverage_stats() -> dict:

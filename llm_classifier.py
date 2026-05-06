@@ -59,15 +59,17 @@ _load_env_file()
 
 from openai import OpenAI   # noqa: E402 — import after env loading
 
+from dewey_to_cnu import section_display_name   # noqa: E402
+
 
 # ───────── Configuration / 配置 ─────────
 # Default model on OpenRouter (can be overridden with --model)
 # OpenRouter 上的默认模型 (可用 --model 覆盖)
 MODEL = "anthropic/claude-opus-4.6"
 
-# Knowledge base path — we use the enriched v2 (contains keywords + English)
-# 知识库路径 — 使用增广 v2 (含关键词 + 英文)
-KB_PATH = Path(__file__).parent / "cnu_knowledge_base_v2.json"
+# Knowledge base path: official CNU sections only.
+# 知识库路径: 只使用官方 CNU section.
+KB_PATH = Path(__file__).parent / "cnu_knowledge_base_official.json"
 
 # OpenAI-compatible client pointing at OpenRouter
 # OpenAI 兼容的 client, base_url 指向 OpenRouter
@@ -83,27 +85,29 @@ def load_kb() -> list[dict]:
     加载知识库, 按 section 代码排序.
     """
     kb = json.loads(KB_PATH.read_text(encoding="utf-8"))
-    kb.sort(key=lambda s: s["code_section"])
-    return kb
+    sections = kb.get("sections", [])
+    sections.sort(key=lambda s: s["code_section"])
+    return sections
 
 
 def build_system_prompt(kb: list[dict]) -> str:
-    """Compose a system prompt listing all 82 CNU sections with keywords.
-    生成列出全部 82 个 CNU section (含关键词) 的 system prompt.
+    """Compose a system prompt listing the official CNU sections.
+    生成列出官方 CNU section 的 system prompt.
     """
     lines = [
         "You are an expert classifier for French CNU (Conseil National des Universités) sections.",
         "Given a course description in English or French, identify which CNU section(s) it belongs to.",
         "",
-        "The 82 CNU sections (code, English name / French name - keywords EN | keywords FR):",
+        f"The {len(kb)} official CNU sections are listed below.",
+        "Each line contains: code, English display name / official French name, and official group.",
         "",
     ]
     for s in kb:
-        kw_en = ", ".join(s.get("keywords_en", [])[:5])
-        kw_fr = ", ".join(s.get("keywords_fr", [])[:5])
+        code = s["code_section"]
+        display_name = section_display_name(code, s.get("section_fr"))
         lines.append(
-            f"  {s['code_section']} {s['section_en']} / {s['section_fr']}"
-            f"  - {kw_en} | {kw_fr}"
+            f"  {code} {display_name}"
+            f"  - group {s.get('code_groupe', '?')}: {s.get('groupe_fr', '?')}"
         )
     lines += [
         "",
@@ -114,6 +118,23 @@ def build_system_prompt(kb: list[dict]) -> str:
         "List sections most relevant first. Use exact 2-digit codes from the list above.",
     ]
     return "\n".join(lines)
+
+
+def allowed_codes(kb: list[dict]) -> set[str]:
+    """Return the set of official CNU section codes."""
+    return {s["code_section"] for s in kb}
+
+
+def clean_codes(codes: list, allowed: set[str]) -> list[str]:
+    """Normalize model output and keep only official CNU section codes."""
+    cleaned: list[str] = []
+    for code in codes:
+        code = str(code).strip().zfill(2)
+        if code in allowed and code not in cleaned:
+            cleaned.append(code)
+        if len(cleaned) >= 3:
+            break
+    return cleaned
 
 
 # ───────── Classification core / 分类核心 ─────────
@@ -147,7 +168,14 @@ def interactive_mode(system_prompt: str, kb: list[dict]) -> None:
     """Read a description, classify it, repeat. Exit on 'exit' / Ctrl-D.
     循环读入描述 → 分类 → 继续. 输入 exit 或 Ctrl-D 退出.
     """
-    by_code = {s["code_section"]: s["section_en"] for s in kb}
+    by_code = {
+        s["code_section"]: section_display_name(
+            s["code_section"],
+            s.get("section_fr"),
+        )
+        for s in kb
+    }
+    official_codes = allowed_codes(kb)
     print(f"Model: {MODEL}")
     print("Interactive mode. Enter a course description + Enter to classify.")
     print("Type 'exit' / 'quit' or press Ctrl-D to leave.")
@@ -163,7 +191,7 @@ def interactive_mode(system_prompt: str, kb: list[dict]) -> None:
         if text.lower() in ("exit", "quit", ":q"):
             break
         try:
-            codes = classify(text, system_prompt)
+            codes = clean_codes(classify(text, system_prompt), official_codes)
         except Exception as e:
             print(f"  Error: {e}\n")
             continue
@@ -196,6 +224,7 @@ def main() -> None:
 
     kb = load_kb()
     system_prompt = build_system_prompt(kb)
+    official_codes = allowed_codes(kb)
 
     if args.dry_run:
         print(system_prompt)
@@ -213,8 +242,14 @@ def main() -> None:
 
     if args.text:
         # One-shot classification / 单条分类
-        codes = classify(args.text, system_prompt)
-        by_code = {s["code_section"]: s["section_en"] for s in kb}
+        codes = clean_codes(classify(args.text, system_prompt), official_codes)
+        by_code = {
+            s["code_section"]: section_display_name(
+                s["code_section"],
+                s.get("section_fr"),
+            )
+            for s in kb
+        }
         print(f"Model: {MODEL}")
         print(f"Description: {args.text}")
         print("Prediction:")
