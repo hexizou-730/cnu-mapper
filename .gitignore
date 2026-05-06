@@ -1,0 +1,23 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local environments and secrets
+.env
+.venv/
+venv/
+
+# Large generated datasets
+raw.csv
+theses.csv
+theses_labeled.csv
+
+# Trained model artifacts
+*.pkl
+
+# Logs and evaluation outputs
+*.log
+eval_*.txt
+
+# macOS metadata
+.DS_Store

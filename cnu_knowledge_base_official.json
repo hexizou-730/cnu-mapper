@@ -1,0 +1,589 @@
+{
+  "_metadata": {
+    "description": "Nomenclature officielle des sections du Conseil national des universités (CNU). Données strictement officielles, aucune dérivation ni enrichissement.",
+    "total_sections": 80,
+    "license": "Licence Ouverte 2.0 (Open License 2.0)",
+    "sources": {
+      "general_cnu": {
+        "type": "arrêté",
+        "name": "Arrêté du 18 décembre 2018 fixant la liste des groupes et des sections du CNU",
+        "url": "https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000038015526",
+        "portal": "https://www.galaxie.enseignementsup-recherche.gouv.fr/ensup/pdf/qualification/sections.pdf"
+      },
+      "health_cnu": {
+        "type": "arrêté",
+        "name": "Arrêté du 29 juin 1992 (modifié par Arrêté du 27 juin 2024) — Disciplines de santé",
+        "url": "https://www.legifrance.gouv.fr/loda/id/JORFTEXT000000174965"
+      }
+    },
+    "fields": {
+      "code_section": "官方 2 位数 section 代码",
+      "code_groupe": "所属 groupe 罗马数字编号",
+      "groupe_fr": "groupe 法语名称",
+      "section_fr": "section 法语名称 (官方)",
+      "source": "数据来源: 'general' 或 'health'"
+    }
+  },
+  "sections": [
+    {
+      "code_section": "01",
+      "code_groupe": "I",
+      "groupe_fr": "Droit, économie et gestion",
+      "section_fr": "Droit privé et sciences criminelles",
+      "source": "general"
+    },
+    {
+      "code_section": "02",
+      "code_groupe": "I",
+      "groupe_fr": "Droit, économie et gestion",
+      "section_fr": "Droit public",
+      "source": "general"
+    },
+    {
+      "code_section": "03",
+      "code_groupe": "I",
+      "groupe_fr": "Droit, économie et gestion",
+      "section_fr": "Histoire du droit et des institutions",
+      "source": "general"
+    },
+    {
+      "code_section": "04",
+      "code_groupe": "I",
+      "groupe_fr": "Droit, économie et gestion",
+      "section_fr": "Science politique",
+      "source": "general"
+    },
+    {
+      "code_section": "05",
+      "code_groupe": "I",
+      "groupe_fr": "Droit, économie et gestion",
+      "section_fr": "Sciences économiques",
+      "source": "general"
+    },
+    {
+      "code_section": "06",
+      "code_groupe": "I",
+      "groupe_fr": "Droit, économie et gestion",
+      "section_fr": "Sciences de gestion",
+      "source": "general"
+    },
+    {
+      "code_section": "07",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Sciences du langage : linguistique et phonétique générales",
+      "source": "general"
+    },
+    {
+      "code_section": "08",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Langues et littératures anciennes",
+      "source": "general"
+    },
+    {
+      "code_section": "09",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Langue et littérature françaises",
+      "source": "general"
+    },
+    {
+      "code_section": "10",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Littératures comparées",
+      "source": "general"
+    },
+    {
+      "code_section": "11",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Langues et littératures anglaises et anglo-saxonnes",
+      "source": "general"
+    },
+    {
+      "code_section": "12",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Langues et littératures germaniques et scandinaves",
+      "source": "general"
+    },
+    {
+      "code_section": "13",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Langues et littératures slaves",
+      "source": "general"
+    },
+    {
+      "code_section": "14",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Langues et littératures romanes : espagnol, italien, portugais, autres langues romanes",
+      "source": "general"
+    },
+    {
+      "code_section": "15",
+      "code_groupe": "II",
+      "groupe_fr": "Lettres et sciences humaines",
+      "section_fr": "Langues et littératures arabes, chinoises, japonaises, hébraïques, d'autres domaines linguistiques",
+      "source": "general"
+    },
+    {
+      "code_section": "16",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Psychologie, psychologie clinique, psychologie sociale",
+      "source": "general"
+    },
+    {
+      "code_section": "17",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Philosophie",
+      "source": "general"
+    },
+    {
+      "code_section": "18",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Architecture (ses théories et ses pratiques), arts appliqués, arts plastiques, arts du spectacle, épistémologie des enseignements artistiques, esthétique, musicologie, musique, sciences de l'art",
+      "source": "general"
+    },
+    {
+      "code_section": "19",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Sociologie, démographie",
+      "source": "general"
+    },
+    {
+      "code_section": "20",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Anthropologie biologique, ethnologie, préhistoire",
+      "source": "general"
+    },
+    {
+      "code_section": "21",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Histoire, civilisation, archéologie et art des mondes anciens et médiévaux",
+      "source": "general"
+    },
+    {
+      "code_section": "22",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Histoire et civilisations : histoire des mondes modernes, histoire du monde contemporain, de l'art, de la musique",
+      "source": "general"
+    },
+    {
+      "code_section": "23",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Géographie physique, humaine, économique et régionale",
+      "source": "general"
+    },
+    {
+      "code_section": "24",
+      "code_groupe": "III",
+      "groupe_fr": "Sciences humaines et humanités",
+      "section_fr": "Aménagement de l'espace, urbanisme",
+      "source": "general"
+    },
+    {
+      "code_section": "25",
+      "code_groupe": "IV",
+      "groupe_fr": "Mathématiques et informatique",
+      "section_fr": "Mathématiques",
+      "source": "general"
+    },
+    {
+      "code_section": "26",
+      "code_groupe": "IV",
+      "groupe_fr": "Mathématiques et informatique",
+      "section_fr": "Mathématiques appliquées et applications des mathématiques",
+      "source": "general"
+    },
+    {
+      "code_section": "27",
+      "code_groupe": "IV",
+      "groupe_fr": "Mathématiques et informatique",
+      "section_fr": "Informatique",
+      "source": "general"
+    },
+    {
+      "code_section": "28",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Milieux denses et matériaux",
+      "source": "general"
+    },
+    {
+      "code_section": "29",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Constituants élémentaires",
+      "source": "general"
+    },
+    {
+      "code_section": "30",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Milieux dilués et optique",
+      "source": "general"
+    },
+    {
+      "code_section": "31",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Chimie théorique, physique, analytique",
+      "source": "general"
+    },
+    {
+      "code_section": "32",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Chimie organique, minérale, industrielle",
+      "source": "general"
+    },
+    {
+      "code_section": "33",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Chimie des matériaux",
+      "source": "general"
+    },
+    {
+      "code_section": "34",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Astronomie, astrophysique",
+      "source": "general"
+    },
+    {
+      "code_section": "35",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Structure et évolution de la Terre et des autres planètes",
+      "source": "general"
+    },
+    {
+      "code_section": "36",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Terre solide : géodynamique des enveloppes supérieures, paléo-biosphère",
+      "source": "general"
+    },
+    {
+      "code_section": "37",
+      "code_groupe": "V",
+      "groupe_fr": "Physique, chimie et sciences de la matière",
+      "section_fr": "Météorologie, océanographie physique et physique de l'environnement",
+      "source": "general"
+    },
+    {
+      "code_section": "42",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Morphologie et morphogenèse",
+      "source": "health"
+    },
+    {
+      "code_section": "43",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Biophysique et imagerie médicale",
+      "source": "health"
+    },
+    {
+      "code_section": "44",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Biochimie, biologie cellulaire et moléculaire, physiologie et nutrition",
+      "source": "health"
+    },
+    {
+      "code_section": "45",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Microbiologie, maladies transmissibles et hygiène",
+      "source": "health"
+    },
+    {
+      "code_section": "46",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Santé publique, environnement et société",
+      "source": "health"
+    },
+    {
+      "code_section": "47",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Cancérologie, génétique, hématologie, immunologie",
+      "source": "health"
+    },
+    {
+      "code_section": "48",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Anesthésiologie, réanimation, médecine d'urgence, pharmacologie et thérapeutique",
+      "source": "health"
+    },
+    {
+      "code_section": "49",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Pathologie nerveuse et musculaire, pathologie mentale, handicap et rééducation",
+      "source": "health"
+    },
+    {
+      "code_section": "50",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Pathologie ostéo-articulaire, dermatologie et chirurgie plastique",
+      "source": "health"
+    },
+    {
+      "code_section": "51",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Pathologie cardiorespiratoire et vasculaire",
+      "source": "health"
+    },
+    {
+      "code_section": "52",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Maladies des appareils digestif et urinaire",
+      "source": "health"
+    },
+    {
+      "code_section": "53",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Médecine interne, gériatrie et médecine générale",
+      "source": "health"
+    },
+    {
+      "code_section": "54",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Développement et pathologie de l'enfant, gynécologie-obstétrique, endocrinologie et reproduction",
+      "source": "health"
+    },
+    {
+      "code_section": "55",
+      "code_groupe": "M-I",
+      "groupe_fr": "Disciplines médicales",
+      "section_fr": "Pathologie de la tête et du cou",
+      "source": "health"
+    },
+    {
+      "code_section": "56",
+      "code_groupe": "M-II",
+      "groupe_fr": "Disciplines odontologiques",
+      "section_fr": "Développement, croissance et prévention",
+      "source": "health"
+    },
+    {
+      "code_section": "57",
+      "code_groupe": "M-II",
+      "groupe_fr": "Disciplines odontologiques",
+      "section_fr": "Chirurgie orale, parodontologie, biologie orale",
+      "source": "health"
+    },
+    {
+      "code_section": "58",
+      "code_groupe": "M-II",
+      "groupe_fr": "Disciplines odontologiques",
+      "section_fr": "Réhabilitation orale",
+      "source": "health"
+    },
+    {
+      "code_section": "60",
+      "code_groupe": "VI",
+      "groupe_fr": "Sciences pour l'ingénieur",
+      "section_fr": "Mécanique, génie mécanique, génie civil",
+      "source": "general"
+    },
+    {
+      "code_section": "61",
+      "code_groupe": "VI",
+      "groupe_fr": "Sciences pour l'ingénieur",
+      "section_fr": "Génie informatique, automatique et traitement du signal",
+      "source": "general"
+    },
+    {
+      "code_section": "62",
+      "code_groupe": "VI",
+      "groupe_fr": "Sciences pour l'ingénieur",
+      "section_fr": "Énergétique, génie des procédés",
+      "source": "general"
+    },
+    {
+      "code_section": "63",
+      "code_groupe": "VI",
+      "groupe_fr": "Sciences pour l'ingénieur",
+      "section_fr": "Génie électrique, électronique, photonique et systèmes",
+      "source": "general"
+    },
+    {
+      "code_section": "64",
+      "code_groupe": "VII",
+      "groupe_fr": "Sciences de la vie",
+      "section_fr": "Biochimie et biologie moléculaire",
+      "source": "general"
+    },
+    {
+      "code_section": "65",
+      "code_groupe": "VII",
+      "groupe_fr": "Sciences de la vie",
+      "section_fr": "Biologie cellulaire",
+      "source": "general"
+    },
+    {
+      "code_section": "66",
+      "code_groupe": "VII",
+      "groupe_fr": "Sciences de la vie",
+      "section_fr": "Physiologie",
+      "source": "general"
+    },
+    {
+      "code_section": "67",
+      "code_groupe": "VII",
+      "groupe_fr": "Sciences de la vie",
+      "section_fr": "Biologie des populations et écologie",
+      "source": "general"
+    },
+    {
+      "code_section": "68",
+      "code_groupe": "VII",
+      "groupe_fr": "Sciences de la vie",
+      "section_fr": "Biologie des organismes",
+      "source": "general"
+    },
+    {
+      "code_section": "69",
+      "code_groupe": "VII",
+      "groupe_fr": "Sciences de la vie",
+      "section_fr": "Neurosciences",
+      "source": "general"
+    },
+    {
+      "code_section": "70",
+      "code_groupe": "VIII",
+      "groupe_fr": "Sciences humaines et éducation",
+      "section_fr": "Sciences de l'éducation",
+      "source": "general"
+    },
+    {
+      "code_section": "71",
+      "code_groupe": "VIII",
+      "groupe_fr": "Sciences humaines et éducation",
+      "section_fr": "Sciences de l'information et de la communication",
+      "source": "general"
+    },
+    {
+      "code_section": "72",
+      "code_groupe": "VIII",
+      "groupe_fr": "Sciences humaines et éducation",
+      "section_fr": "Épistémologie, histoire des sciences et des techniques",
+      "source": "general"
+    },
+    {
+      "code_section": "73",
+      "code_groupe": "VIII",
+      "groupe_fr": "Sciences humaines et éducation",
+      "section_fr": "Cultures et langues régionales",
+      "source": "general"
+    },
+    {
+      "code_section": "74",
+      "code_groupe": "VIII",
+      "groupe_fr": "Sciences humaines et éducation",
+      "section_fr": "Sciences et techniques des activités physiques et sportives",
+      "source": "general"
+    },
+    {
+      "code_section": "76",
+      "code_groupe": "X",
+      "groupe_fr": "Théologie",
+      "section_fr": "Théologie catholique",
+      "source": "general"
+    },
+    {
+      "code_section": "77",
+      "code_groupe": "X",
+      "groupe_fr": "Théologie",
+      "section_fr": "Théologie protestante",
+      "source": "general"
+    },
+    {
+      "code_section": "80",
+      "code_groupe": "M-III",
+      "groupe_fr": "Pharmacie (bi-appartenants)",
+      "section_fr": "Sciences physico-chimiques et ingénierie appliquée à la santé (bi-appartenants)",
+      "source": "health"
+    },
+    {
+      "code_section": "81",
+      "code_groupe": "M-III",
+      "groupe_fr": "Pharmacie (bi-appartenants)",
+      "section_fr": "Sciences du médicament et des autres produits de santé (bi-appartenants)",
+      "source": "health"
+    },
+    {
+      "code_section": "82",
+      "code_groupe": "M-III",
+      "groupe_fr": "Pharmacie (bi-appartenants)",
+      "section_fr": "Sciences biologiques, fondamentales et cliniques (bi-appartenants)",
+      "source": "health"
+    },
+    {
+      "code_section": "85",
+      "code_groupe": "XII",
+      "groupe_fr": "Pharmacie",
+      "section_fr": "Sciences physico-chimiques et technologies pharmaceutiques",
+      "source": "general"
+    },
+    {
+      "code_section": "86",
+      "code_groupe": "XII",
+      "groupe_fr": "Pharmacie",
+      "section_fr": "Sciences du médicament",
+      "source": "general"
+    },
+    {
+      "code_section": "87",
+      "code_groupe": "XII",
+      "groupe_fr": "Pharmacie",
+      "section_fr": "Sciences biologiques pharmaceutiques",
+      "source": "general"
+    },
+    {
+      "code_section": "90",
+      "code_groupe": "M-IV",
+      "groupe_fr": "Autres disciplines de santé (mono-appartenants)",
+      "section_fr": "Maïeutique",
+      "source": "health"
+    },
+    {
+      "code_section": "91",
+      "code_groupe": "M-IV",
+      "groupe_fr": "Autres disciplines de santé (mono-appartenants)",
+      "section_fr": "Sciences de la rééducation et de réadaptation",
+      "source": "health"
+    },
+    {
+      "code_section": "92",
+      "code_groupe": "M-IV",
+      "groupe_fr": "Autres disciplines de santé (mono-appartenants)",
+      "section_fr": "Sciences infirmières",
+      "source": "health"
+    }
+  ]
+}
