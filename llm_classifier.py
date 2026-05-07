@@ -1,24 +1,26 @@
 """
-CNU Mapper · LLM-based Classifier
+CNU Mapper - LLM-based Classifier
 ==================================
 
 Classify university course descriptions (EN / FR / mixed) into one or more
 CNU (Conseil National des Universités) sections, using Claude Opus 4.6
 accessed via the OpenRouter API.
 
-将大学课程描述 (英 / 法 / 混合) 映射到一个或多个 CNU 学科代码.
-通过 OpenRouter API 调用 Claude Opus 4.6 完成分类.
+This script is intentionally separate from the DDC-based sklearn pipeline.
+It does not train a local model. Instead, it builds a prompt from the official
+CNU section list, sends the user's course description to an OpenRouter model,
+and parses the returned JSON section codes.
 
-Usage / 用法:
+Usage:
     conda activate cnu_mapper
-    python llm_classifier.py                    # interactive mode / 交互模式
-    python llm_classifier.py "description..."   # one-shot / 单条分类
-    python llm_classifier.py --dry-run          # preview prompt only / 仅预览 prompt
-    python llm_classifier.py --model <slug>     # switch model / 换模型
+    python llm_classifier.py                    # interactive mode
+    python llm_classifier.py "description..."   # one-shot classification
+    python llm_classifier.py --dry-run          # preview prompt only
+    python llm_classifier.py --model <slug>     # switch OpenRouter model
 
-API key resolution order / API key 查找顺序:
-    1. OPENROUTER_API_KEY environment variable / 环境变量
-    2. .env file in the project directory / 项目目录下的 .env 文件
+API key resolution order:
+    1. OPENROUTER_API_KEY environment variable
+    2. .env file in the project directory
 """
 
 from __future__ import annotations
@@ -31,14 +33,17 @@ import sys
 from pathlib import Path
 
 
-# ───────── .env auto-loader / 自动加载 .env ─────────
+# ───────── .env auto-loader ─────────
 def _load_env_file() -> None:
-    """Load .env file before any imports that might use the key.
-    在需要 key 的模块导入之前加载 .env.
+    """Load an OpenRouter API key from a local .env file if present.
 
-    Accepts two formats / 支持两种格式:
-      OPENROUTER_API_KEY=sk-or-v1-xxx     (standard / 标准)
-      sk-or-v1-xxx                         (tolerated / 容错, 只写 key 也行)
+    The project keeps .env out of Git, but allowing this local file makes the
+    CLI easier to run during demos. Two formats are accepted:
+
+      OPENROUTER_API_KEY=sk-or-v1-xxx
+      sk-or-v1-xxx
+
+    The second form is tolerated so a user can paste only the key into .env.
     """
     env_path = Path(__file__).parent / ".env"
     if not env_path.exists():
@@ -62,27 +67,27 @@ from openai import OpenAI   # noqa: E402 — import after env loading
 from dewey_to_cnu import section_display_name   # noqa: E402
 
 
-# ───────── Configuration / 配置 ─────────
+# ───────── Configuration ─────────
 # Default model on OpenRouter (can be overridden with --model)
-# OpenRouter 上的默认模型 (可用 --model 覆盖)
 MODEL = "anthropic/claude-opus-4.6"
 
 # Knowledge base path: official CNU sections only.
-# 知识库路径: 只使用官方 CNU section.
 KB_PATH = Path(__file__).parent / "cnu_knowledge_base_official.json"
 
-# OpenAI-compatible client pointing at OpenRouter
-# OpenAI 兼容的 client, base_url 指向 OpenRouter
+# OpenRouter exposes an OpenAI-compatible chat completions API.
 client = OpenAI(
     api_key=os.environ.get("OPENROUTER_API_KEY", ""),
     base_url="https://openrouter.ai/api/v1",
 )
 
 
-# ───────── Prompt construction / Prompt 构造 ─────────
+# ───────── Prompt construction ─────────
 def load_kb() -> list[dict]:
-    """Load and sort the knowledge base by section code.
-    加载知识库, 按 section 代码排序.
+    """Load the official CNU knowledge base.
+
+    The official JSON is a dictionary with metadata and a `sections` list. This
+    function returns only the section rows, sorted by code, because that is the
+    form needed for prompt construction and output validation.
     """
     kb = json.loads(KB_PATH.read_text(encoding="utf-8"))
     sections = kb.get("sections", [])
@@ -91,8 +96,12 @@ def load_kb() -> list[dict]:
 
 
 def build_system_prompt(kb: list[dict]) -> str:
-    """Compose a system prompt listing the official CNU sections.
-    生成列出官方 CNU section 的 system prompt.
+    """Compose the system prompt sent to the LLM.
+
+    The prompt explicitly lists the allowed label space. Each row includes the
+    official CNU code, an English display name maintained by the project, the
+    official French section name, and the official group. This reduces the
+    chance that the model invents codes outside the CNU nomenclature.
     """
     lines = [
         "You are an expert classifier for French CNU (Conseil National des Universités) sections.",
@@ -121,12 +130,18 @@ def build_system_prompt(kb: list[dict]) -> str:
 
 
 def allowed_codes(kb: list[dict]) -> set[str]:
-    """Return the set of official CNU section codes."""
+    """Return the allowed official CNU section codes."""
     return {s["code_section"] for s in kb}
 
 
 def clean_codes(codes: list, allowed: set[str]) -> list[str]:
-    """Normalize model output and keep only official CNU section codes."""
+    """Normalize raw model output and keep only official CNU codes.
+
+    The model is instructed to return JSON, but external APIs can still return
+    unexpected types or duplicate labels. This function is a small safety layer:
+    it zero-pads numeric-looking codes, removes duplicates, filters non-official
+    codes, and caps the final answer at three sections.
+    """
     cleaned: list[str] = []
     for code in codes:
         code = str(code).strip().zfill(2)
@@ -137,12 +152,14 @@ def clean_codes(codes: list, allowed: set[str]) -> list[str]:
     return cleaned
 
 
-# ───────── Classification core / 分类核心 ─────────
+# ───────── Classification core ─────────
 def classify(description: str, system_prompt: str) -> list[str]:
-    """Call the LLM and parse the returned section codes.
-    调用 LLM 并解析返回的 section 代码列表.
+    """Call the OpenRouter model and parse returned CNU section codes.
 
-    Returns / 返回: e.g. ['27', '26']
+    The request uses `response_format={"type": "json_object"}` to encourage a
+    machine-readable response. If the returned content is not valid JSON, the
+    fallback regex extracts quoted two-digit codes so the CLI can still recover
+    a useful answer.
     """
     resp = client.chat.completions.create(
         model=MODEL,
@@ -159,14 +176,15 @@ def classify(description: str, system_prompt: str) -> list[str]:
         return json.loads(content).get("sections", [])[:3]
     except json.JSONDecodeError:
         # Fallback: regex-extract any 2-digit codes wrapped in quotes
-        # 兜底: 用正则从文本里抓带引号的 2 位数字代码
         return re.findall(r'"(\d{2})"', content)[:3]
 
 
-# ───────── Interactive REPL / 交互模式 ─────────
+# ───────── Interactive REPL ─────────
 def interactive_mode(system_prompt: str, kb: list[dict]) -> None:
-    """Read a description, classify it, repeat. Exit on 'exit' / Ctrl-D.
-    循环读入描述 → 分类 → 继续. 输入 exit 或 Ctrl-D 退出.
+    """Run a small command-line REPL for manual classification.
+
+    The same prompt and code-cleaning logic are reused for every input so that
+    interactive predictions behave like one-shot predictions.
     """
     by_code = {
         s["code_section"]: section_display_name(
@@ -191,6 +209,7 @@ def interactive_mode(system_prompt: str, kb: list[dict]) -> None:
         if text.lower() in ("exit", "quit", ":q"):
             break
         try:
+            # Keep the post-processing identical to one-shot mode.
             codes = clean_codes(classify(text, system_prompt), official_codes)
         except Exception as e:
             print(f"  Error: {e}\n")
@@ -204,8 +223,9 @@ def interactive_mode(system_prompt: str, kb: list[dict]) -> None:
     print("Bye!")
 
 
-# ───────── CLI entry point / 命令行入口 ─────────
+# ───────── CLI entry point ─────────
 def main() -> None:
+    """Parse CLI arguments and run dry-run, one-shot, or interactive mode."""
     parser = argparse.ArgumentParser(
         description="CNU course-description classifier via OpenRouter (Claude Opus 4.6)."
     )
@@ -227,6 +247,8 @@ def main() -> None:
     official_codes = allowed_codes(kb)
 
     if args.dry_run:
+        # Dry-run is useful for reviewing the exact label-space prompt without
+        # spending API credits or requiring an API key.
         print(system_prompt)
         print(f"\n[system prompt length: {len(system_prompt)} chars "
               f"approx. {len(system_prompt) // 4} tokens]")
@@ -241,7 +263,7 @@ def main() -> None:
         )
 
     if args.text:
-        # One-shot classification / 单条分类
+        # One-shot classification for scripts, examples, and quick checks.
         codes = clean_codes(classify(args.text, system_prompt), official_codes)
         by_code = {
             s["code_section"]: section_display_name(
@@ -256,7 +278,7 @@ def main() -> None:
         for c in codes:
             print(f"  {c}  {by_code.get(c, '?')}")
     else:
-        # Interactive mode / 交互模式
+        # Interactive mode for manually trying several descriptions.
         interactive_mode(system_prompt, kb)
 
 
