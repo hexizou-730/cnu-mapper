@@ -38,6 +38,12 @@ RESUME_MAX_LEN = 4000
 
 
 def main() -> None:
+    """Build theses_labeled.csv from the raw theses CSV.
+
+    The output file is the weakly labeled training set used by the DDC-based
+    classifiers. Labels are not manually annotated; they are derived by reading
+    Dewey codes from the source CSV and mapping those codes to CNU sections.
+    """
     if not RAW_CSV.exists():
         sys.exit(f"Error: {RAW_CSV.name} not found. Run fetch_theses.py --download first.")
 

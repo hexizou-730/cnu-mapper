@@ -18,6 +18,7 @@ Two scikit-learn variants are implemented:
 Usage:
     python ddc_classifier.py --train --model-type logreg
     python ddc_classifier.py --eval  --model-type logreg
+    python ddc_classifier.py --baselines
     python ddc_classifier.py --train --model-type mlp
     python ddc_classifier.py --eval  --model-type mlp
     python ddc_classifier.py --compare
@@ -98,6 +99,12 @@ MLP_TFIDF_PARAMS = dict(
 
 # ─────────── Data / 数据 ───────────
 def load_kb() -> dict[str, str]:
+    """Load official CNU names and attach project-maintained English labels.
+
+    The official JSON contains authoritative CNU codes and French names only.
+    English names are kept in dewey_to_cnu.py so that official data remains
+    clean while CLI output stays readable.
+    """
     kb = json.loads(KB_PATH.read_text(encoding="utf-8"))
     sections = kb.get("sections", [])
     return {
@@ -110,7 +117,13 @@ def load_kb() -> dict[str, str]:
 
 
 def load_data(max_samples: int | None = None) -> tuple[list[str], list[list[str]], list[list[str]]]:
-    """Return (texts, ddc_labels, cnu_labels)."""
+    """Read the labeled CSV used by every DDC-based experiment.
+
+    Returns:
+        A tuple of (texts, ddc_labels, cnu_labels), where labels are already
+        split into lists. Keeping DDC and CNU labels side by side lets us score
+        both the intermediate DDC task and the final CNU task.
+    """
     if not TRAIN_CSV.exists():
         sys.exit(
             f"Error: {TRAIN_CSV.name} not found.\n"
@@ -132,20 +145,43 @@ def load_data(max_samples: int | None = None) -> tuple[list[str], list[list[str]
 
 
 def split_indices(n: int, train_fraction: float, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return a deterministic shuffled split of integer row indices."""
     rng = np.random.default_rng(seed)
     indices = rng.permutation(n)
     split = int(n * train_fraction)
     return indices[:split], indices[split:]
 
 
+def make_train_test_split(
+    n: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Create the shared fit/validation/test indices for evaluation.
+
+    All reported rows, including Random and Majority baselines, use the same
+    80/20 outer split. Trainable models further split the 80% training portion
+    into fit and validation subsets for threshold calibration.
+    """
+    train_idx, test_idx = split_indices(n, 0.80, RANDOM_SEED)
+    fit_pos, val_pos = split_indices(
+        len(train_idx), 1.0 - VALIDATION_FRACTION, RANDOM_SEED + 1
+    )
+    return train_idx, train_idx[fit_pos], train_idx[val_pos], test_idx
+
+
 # ─────────── Model factories / 模型工厂 ───────────
 def make_vectorizer(model_type: str) -> TfidfVectorizer:
+    """Create the TF-IDF vectorizer for one model family."""
     if model_type == "mlp":
         return TfidfVectorizer(**MLP_TFIDF_PARAMS)
     return TfidfVectorizer(**LOGREG_TFIDF_PARAMS)
 
 
 def make_classifier(model_type: str):
+    """Create the sklearn classifier behind each DDC model.
+
+    LogReg uses one binary classifier per DDC label. The MLP baseline uses one
+    neural network that predicts the full DDC multi-label vector at once.
+    """
     if model_type == "mlp":
         return MLPClassifier(
             hidden_layer_sizes=(64,),
@@ -172,6 +208,7 @@ def make_classifier(model_type: str):
 
 
 def model_path(model_type: str) -> Path:
+    """Return the local pickle path for a trained DDC model."""
     return MODEL_PATHS[model_type]
 
 
@@ -189,6 +226,12 @@ def predict_binary_matrix(
     threshold: float,
     top_k: int = TOP_K,
 ) -> np.ndarray:
+    """Convert probability scores into a multi-label prediction matrix.
+
+    A label is kept when it is both among the top-k labels for that row and
+    above the calibrated threshold. If no label passes the threshold, the
+    highest-scoring label is kept so every input receives at least one DDC.
+    """
     y_pred = np.zeros(proba.shape, dtype=int)
     for i in range(proba.shape[0]):
         ranked = np.argsort(-proba[i])
@@ -200,6 +243,7 @@ def predict_binary_matrix(
 
 
 def tune_threshold(proba: np.ndarray, y_true: np.ndarray) -> tuple[float, float]:
+    """Select the global DDC threshold that maximizes validation micro-F1."""
     best_threshold = PROBA_THRESHOLD
     best_score = -1.0
     for threshold in THRESHOLD_GRID:
@@ -212,6 +256,7 @@ def tune_threshold(proba: np.ndarray, y_true: np.ndarray) -> tuple[float, float]
 
 
 def ddc_to_cnu_codes(ddc_codes: list[str]) -> list[str]:
+    """Map a list of DDC codes to a de-duplicated list of CNU section codes."""
     out: list[str] = []
     seen: set[str] = set()
     for ddc in ddc_codes:
@@ -227,6 +272,12 @@ def ddc_binary_to_cnu_binary(
     ddc_classes: np.ndarray,
     cnu_mlb: MultiLabelBinarizer,
 ) -> np.ndarray:
+    """Map binary DDC predictions into the CNU label space.
+
+    This keeps the evaluation faithful to the project design: models predict
+    DDC first, and all final CNU scores are computed after the rule-based
+    DDC-to-CNU mapping.
+    """
     cnu_rows: list[list[str]] = []
     for row in y_ddc:
         ddc_codes = [ddc_classes[j] for j in np.where(row)[0]]
@@ -235,6 +286,7 @@ def ddc_binary_to_cnu_binary(
 
 
 def predict_one(text: str, vectorizer, clf, ddc_mlb, threshold: float) -> tuple[list[str], list[str]]:
+    """Predict DDC and mapped CNU codes for one free-text description."""
     x = vectorizer.transform([text])
     proba = predict_proba_matrix(clf, x)
     y_pred = predict_binary_matrix(proba, threshold)
@@ -245,6 +297,36 @@ def predict_one(text: str, vectorizer, clf, ddc_mlb, threshold: float) -> tuple[
 
 
 # ─────────── Metrics / 指标 ───────────
+def compute_metrics_from_ddc_binary(
+    model_name: str,
+    y_ddc_pred: np.ndarray,
+    y_ddc_true: np.ndarray,
+    y_cnu_true: np.ndarray,
+    ddc_mlb: MultiLabelBinarizer,
+    cnu_mlb: MultiLabelBinarizer,
+    threshold: float | None = None,
+) -> dict[str, float | str]:
+    """Compute the compact report row from DDC predictions.
+
+    DDC predictions are always scored directly, then mapped into CNU space for
+    final-task metrics. This shared function keeps trained models and simple
+    baselines comparable.
+    """
+    y_cnu_pred = ddc_binary_to_cnu_binary(y_ddc_pred, ddc_mlb.classes_, cnu_mlb)
+
+    return {
+        "model": model_name,
+        "ddc_micro_f1": f1_score(
+            y_ddc_true, y_ddc_pred, average="micro", zero_division=0
+        ),
+        "cnu_micro_f1": f1_score(
+            y_cnu_true, y_cnu_pred, average="micro", zero_division=0
+        ),
+        "cnu_subset_accuracy": accuracy_score(y_cnu_true, y_cnu_pred),
+        "threshold": threshold if threshold is not None else "",
+    }
+
+
 def compute_report_metrics(
     model_type: str,
     proba: np.ndarray,
@@ -254,37 +336,103 @@ def compute_report_metrics(
     cnu_mlb: MultiLabelBinarizer,
     threshold: float,
 ) -> dict[str, float | str]:
+    """Compute metrics for a trained probability-based DDC model."""
     y_ddc_pred = predict_binary_matrix(proba, threshold)
-    y_cnu_pred = ddc_binary_to_cnu_binary(y_ddc_pred, ddc_mlb.classes_, cnu_mlb)
-
-    return {
-        "model": "LogReg" if model_type == "logreg" else "MLP",
-        "ddc_micro_f1": f1_score(
-            y_ddc_true, y_ddc_pred, average="micro", zero_division=0
-        ),
-        "cnu_micro_f1": f1_score(
-            y_cnu_true, y_cnu_pred, average="micro", zero_division=0
-        ),
-        "cnu_subset_accuracy": accuracy_score(y_cnu_true, y_cnu_pred),
-        "threshold": threshold,
-    }
+    model_name = "LogReg" if model_type == "logreg" else "MLP"
+    return compute_metrics_from_ddc_binary(
+        model_name, y_ddc_pred, y_ddc_true, y_cnu_true,
+        ddc_mlb, cnu_mlb, threshold
+    )
 
 
 def print_report_table(rows: list[dict[str, float | str]]) -> None:
+    """Print the compact evaluation table used in README and CLI output."""
     print("\nEVALUATION SUMMARY")
-    print("Model    DDC Micro F1   CNU Micro F1   CNU Subset Accuracy")
-    print("------   ------------   ------------   -------------------")
+    print("Model      DDC Micro F1   CNU Micro F1   CNU Subset Accuracy")
+    print("--------   ------------   ------------   -------------------")
     for row in rows:
         print(
-            f"{row['model']:<6}   "
+            f"{row['model']:<8}   "
             f"{row['ddc_micro_f1']:.4f}         "
             f"{row['cnu_micro_f1']:.4f}         "
             f"{row['cnu_subset_accuracy'] * 100:6.2f}%"
         )
 
 
+# ─────────── Simple baselines / 简单基线 ───────────
+def random_ddc_predictions(n_samples: int, n_classes: int, seed: int) -> np.ndarray:
+    """Predict one uniformly random DDC label for every test sample.
+
+    The random predictor is intentionally simple. It gives an external reader
+    a floor for the metric values: if a trained model cannot beat this row, it
+    is not learning meaningful signal from the abstracts.
+    """
+    rng = np.random.default_rng(seed)
+    chosen = rng.integers(0, n_classes, size=n_samples)
+    y_pred = np.zeros((n_samples, n_classes), dtype=int)
+    y_pred[np.arange(n_samples), chosen] = 1
+    return y_pred
+
+
+def majority_ddc_predictions(y_train: np.ndarray, n_samples: int) -> np.ndarray:
+    """Always predict the most frequent DDC label observed in training data.
+
+    This is the standard majority-class baseline adapted to the DDC-first
+    multi-label setting. It is deliberately naive, but it is often much stronger
+    than random when the dataset is imbalanced.
+    """
+    majority_label = int(np.argmax(y_train.sum(axis=0)))
+    y_pred = np.zeros((n_samples, y_train.shape[1]), dtype=int)
+    y_pred[:, majority_label] = 1
+    return y_pred
+
+
+def evaluate_baselines(max_samples: int | None = None, verbose: bool = True) -> list[dict[str, float | str]]:
+    """Evaluate Random and Majority baselines on the shared 80/20 split."""
+    print(f"Loading data: {TRAIN_CSV.name}")
+    _, ddc_labels, cnu_labels = load_data(max_samples)
+    if max_samples:
+        print(f"   Max samples mode: {max_samples:,}")
+
+    train_idx, _, _, test_idx = make_train_test_split(len(ddc_labels))
+    train_ddc = [ddc_labels[i] for i in train_idx]
+    test_ddc = [ddc_labels[i] for i in test_idx]
+    test_cnu = [cnu_labels[i] for i in test_idx]
+
+    print(f"   Train: {len(train_ddc):,}   Test: {len(test_ddc):,}")
+    print("   Baselines: random, majority")
+
+    ddc_mlb = MultiLabelBinarizer()
+    y_train = ddc_mlb.fit_transform(train_ddc)
+    y_test = ddc_mlb.transform(test_ddc)
+
+    cnu_mlb = MultiLabelBinarizer()
+    cnu_mlb.fit(cnu_labels)
+    y_cnu_test = cnu_mlb.transform(test_cnu)
+
+    random_pred = random_ddc_predictions(
+        n_samples=len(test_ddc),
+        n_classes=len(ddc_mlb.classes_),
+        seed=RANDOM_SEED,
+    )
+    majority_pred = majority_ddc_predictions(y_train, len(test_ddc))
+
+    rows = [
+        compute_metrics_from_ddc_binary(
+            "Random", random_pred, y_test, y_cnu_test, ddc_mlb, cnu_mlb
+        ),
+        compute_metrics_from_ddc_binary(
+            "Majority", majority_pred, y_test, y_cnu_test, ddc_mlb, cnu_mlb
+        ),
+    ]
+    if verbose:
+        print_report_table(rows)
+    return rows
+
+
 # ─────────── Train / Eval / Predict ───────────
 def step_train(model_type: str, max_samples: int | None = None) -> None:
+    """Train one selected DDC model and save it as a pickle artifact."""
     print(f"Loading data: {TRAIN_CSV.name}")
     texts, ddc_labels, cnu_labels = load_data(max_samples)
     print(f"   Samples: {len(texts):,}")
@@ -366,17 +514,13 @@ def evaluate_model(
     max_samples: int | None = None,
     verbose: bool = True,
 ) -> dict[str, float | str]:
+    """Train and evaluate one DDC model on the shared 80/20 split."""
     print(f"Loading data: {TRAIN_CSV.name}")
     texts, ddc_labels, cnu_labels = load_data(max_samples)
     if max_samples:
         print(f"   Max samples mode: {max_samples:,}")
 
-    train_idx, test_idx = split_indices(len(texts), 0.80, RANDOM_SEED)
-    fit_pos, val_pos = split_indices(
-        len(train_idx), 1.0 - VALIDATION_FRACTION, RANDOM_SEED + 1
-    )
-    fit_idx = train_idx[fit_pos]
-    val_idx = train_idx[val_pos]
+    _, fit_idx, val_idx, test_idx = make_train_test_split(len(texts))
 
     fit_texts = [texts[i] for i in fit_idx]
     fit_ddc = [ddc_labels[i] for i in fit_idx]
@@ -433,11 +577,18 @@ def evaluate_model(
 
 
 def step_eval(model_type: str, max_samples: int | None = None) -> None:
+    """CLI wrapper for evaluating one trained-model family from scratch."""
     evaluate_model(model_type, max_samples, verbose=True)
 
 
+def step_baselines(max_samples: int | None = None) -> None:
+    """CLI wrapper for evaluating only the two simple baseline predictors."""
+    evaluate_baselines(max_samples, verbose=True)
+
+
 def step_compare(max_samples: int | None = None) -> None:
-    rows = []
+    """Evaluate baselines plus both trainable DDC models."""
+    rows = evaluate_baselines(max_samples, verbose=False)
     for model_type in ("logreg", "mlp"):
         print(f"\n{'=' * 70}")
         print(f"Running {model_type}")
@@ -447,6 +598,7 @@ def step_compare(max_samples: int | None = None) -> None:
 
 
 def load_model(model_type: str):
+    """Load a saved model bundle produced by step_train."""
     path = model_path(model_type)
     if not path.exists():
         sys.exit(
@@ -464,6 +616,7 @@ def load_model(model_type: str):
 
 
 def interactive_mode(model_type: str, vectorizer, clf, ddc_mlb, threshold: float) -> None:
+    """Run a small REPL for manual one-by-one predictions."""
     by_code = load_kb()
     print(f"Model: DDC {model_type}")
     print(f"Decision threshold: {threshold:.3f}")
@@ -490,6 +643,7 @@ def interactive_mode(model_type: str, vectorizer, clf, ddc_mlb, threshold: float
 
 
 def main() -> None:
+    """Parse CLI arguments and dispatch to training, evaluation, or prediction."""
     parser = argparse.ArgumentParser(
         description="Predict DDC first, then map DDC to CNU."
     )
@@ -501,8 +655,10 @@ def main() -> None:
                         help="Train and save the selected DDC model.")
     parser.add_argument("--eval", action="store_true",
                         help="80/20 evaluation of the selected DDC model.")
+    parser.add_argument("--baselines", action="store_true",
+                        help="Evaluate random and majority baselines only.")
     parser.add_argument("--compare", action="store_true",
-                        help="Evaluate logreg and mlp, then print one compact table.")
+                        help="Evaluate baselines, logreg, and mlp, then print one compact table.")
     parser.add_argument("--max-samples", type=int,
                         help="Optional small-sample run for quick tests. "
                              "Omit this for full training/evaluation.")
@@ -513,6 +669,9 @@ def main() -> None:
         return
     if args.eval:
         step_eval(args.model_type, args.max_samples)
+        return
+    if args.baselines:
+        step_baselines(args.max_samples)
         return
     if args.compare:
         step_compare(args.max_samples)

@@ -163,9 +163,22 @@ python ddc_classifier.py --model-type mlp \
   "Ce cours porte sur la chimie organique, les reactions chimiques et la catalyse."
 ```
 
-### 5.3 Compare Logistic Regression and MLP
+### 5.3 Run Simple Baselines
 
-Run both evaluations and print one compact table:
+Run only the two simple baselines:
+
+```bash
+python ddc_classifier.py --baselines
+```
+
+The Random baseline uniformly samples one DDC code from the training label
+space. The Majority baseline always predicts the most frequent DDC code in the
+training split. Both baselines are mapped through the same DDC-to-CNU table as
+the trainable models.
+
+### 5.4 Compare Baselines, Logistic Regression, and MLP
+
+Run all evaluations and print one compact table:
 
 ```bash
 python ddc_classifier.py --compare
@@ -181,10 +194,12 @@ Expected final output:
 
 ```text
 EVALUATION SUMMARY
-Model    DDC Micro F1   CNU Micro F1   CNU Subset Accuracy
-------   ------------   ------------   -------------------
-LogReg   ...
-MLP      ...
+Model      DDC Micro F1   CNU Micro F1   CNU Subset Accuracy
+--------   ------------   ------------   -------------------
+Random     ...
+Majority   ...
+LogReg     ...
+MLP        ...
 ```
 
 Important: `--eval` and `--compare` train temporary models for fair evaluation.

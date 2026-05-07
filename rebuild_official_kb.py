@@ -164,6 +164,12 @@ SOURCE_HEALTH = {
 }
 
 def build():
+    """Build the official CNU knowledge-base dictionary.
+
+    The source section lists are stored above as plain tuples so the generated
+    JSON can be audited in Git. Running this script rewrites
+    cnu_knowledge_base_official.json from those official section lists.
+    """
     out = {
         "_metadata": {
             "description": "Nomenclature officielle des sections du Conseil national des universités (CNU). Données strictement officielles, aucune dérivation ni enrichissement.",

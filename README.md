@@ -7,6 +7,9 @@ CNU Mapper is a course-description classifier for French CNU sections
 2. A DDC-based Multi-Layer Perceptron classifier.
 3. A prompt-based LLM classifier via OpenRouter.
 
+It also reports Random and Majority baselines to make the numerical evaluation
+easier to interpret.
+
 The main classical-ML pipeline predicts Dewey Decimal Classification
 (DDC) codes first, then maps the predicted DDC codes to CNU sections with a
 rule-based mapping table.
@@ -83,10 +86,16 @@ bash setup.sh
 conda activate cnu_mapper
 ```
 
-Evaluate the two DDC-based classical-ML methods:
+Evaluate the baselines and the two DDC-based classical-ML methods:
 
 ```bash
 python ddc_classifier.py --compare
+```
+
+Evaluate only the simple baselines:
+
+```bash
+python ddc_classifier.py --baselines
 ```
 
 For a quick smoke test:
@@ -146,26 +155,36 @@ The DDC comparison command prints a compact table:
 
 ```text
 EVALUATION SUMMARY
-Model    DDC Micro F1   CNU Micro F1   CNU Subset Accuracy
-------   ------------   ------------   -------------------
-LogReg   ...
-MLP      ...
+Model      DDC Micro F1   CNU Micro F1   CNU Subset Accuracy
+--------   ------------   ------------   -------------------
+Random     ...
+Majority   ...
+LogReg     ...
+MLP        ...
 ```
 
 Latest full 80/20 evaluation on `theses_labeled.csv`:
 
 | Model | DDC Micro F1 | CNU Micro F1 | CNU Subset Accuracy |
 |---|---:|---:|---:|
+| Random | 0.0112 | 0.0257 | 2.23% |
+| Majority | 0.1229 | 0.1247 | 13.73% |
 | LogReg | 0.6270 | 0.6650 | 60.05% |
 | MLP | 0.5225 | 0.5663 | 50.99% |
 
 Evaluation setup:
 
+- Baseline train split: 265,286 samples
 - Fit split: 212,228 samples
 - Validation split: 53,058 samples
 - Test split: 66,322 samples
 - LogReg calibrated threshold: 0.875
 - MLP calibrated threshold: 0.950
+
+The Random baseline uniformly samples one DDC code from the training label
+space. The Majority baseline always predicts the most frequent DDC code in the
+training split. Both are mapped through the same DDC-to-CNU table as LogReg and
+MLP.
 
 These metrics are used because the task is multi-label:
 
