@@ -1,11 +1,12 @@
 # CNU Mapper
 
 CNU Mapper is a course-description classifier for French CNU sections
-(`Conseil National des Universites`). It compares three approaches:
+(`Conseil National des Universites`). It compares four approaches:
 
 1. A DDC-based One-vs-Rest Logistic Regression classifier.
 2. A DDC-based Multi-Layer Perceptron classifier.
-3. A prompt-based LLM classifier via OpenRouter.
+3. A DDC-based XLM-RoBERTa Transformer classifier.
+4. A prompt-based LLM classifier via OpenRouter.
 
 It also reports Random and Majority baselines to make the numerical evaluation
 easier to interpret.
@@ -18,17 +19,27 @@ rule-based mapping table.
 course description -> DDC prediction -> DDC-to-CNU mapping -> CNU sections
 ```
 
+The supervised learning target is DDC, because DDC codes are present in the
+source thesis metadata. CNU sections are not manually annotated in the dataset;
+they are derived by applying the rule-based DDC-to-CNU mapping. For this reason,
+DDC metrics are the primary evaluation metrics, while mapped CNU metrics should
+be interpreted as proxy downstream metrics.
+
 ## Project Structure
 
 ```text
 cnu_mapper/
 |-- ddc_classifier.py                  # DDC-based LogReg and MLP classifiers
+|-- transformer_ddc_classifier.py      # DDC-based XLM-RoBERTa classifier
 |-- llm_classifier.py                  # Prompt-based LLM classifier
 |-- dewey_to_cnu.py                    # Rule-based DDC-to-CNU mapping table
 |-- label_theses.py                    # Build labeled training data from raw.csv
 |-- fetch_theses.py                    # Download / inspect / filter theses.fr data
 |-- cnu_knowledge_base_official.json   # Official CNU reference used by DDC and LLM output
 |-- DATA_PROVENANCE.md                 # Data source notes
+|-- DATASET_STATISTICS.md              # Dataset size and label-distribution summary
+|-- SHORT_REPORT_EN.md                 # Short project report draft in English
+|-- SHORT_REPORT_ZH.md                 # Short project report draft in Chinese
 `-- USAGE_GUIDE.md                     # Detailed usage guide
 ```
 
@@ -39,6 +50,7 @@ raw.csv
 theses_labeled.csv
 ddc_model_logreg.pkl
 ddc_model_mlp.pkl
+ddc_model_xlm_roberta.pt
 .env
 ```
 
@@ -67,7 +79,19 @@ abstract -> TF-IDF -> MLPClassifier -> full DDC vector -> CNU
 
 A single Multi-Layer Perceptron predicts the full DDC indicator vector.
 
-### 3. LLM Classifier
+### 3. DDC + XLM-RoBERTa Transformer
+
+This is the PyTorch/Transformers approach. It uses the pretrained
+`xlm-roberta-base` encoder and adds a multi-label DDC classification head.
+
+```text
+abstract -> XLM-RoBERTa -> DDC vector -> CNU
+```
+
+The model still predicts DDC first. CNU sections are produced by the same
+rule-based DDC-to-CNU mapping used by LogReg and MLP.
+
+### 4. LLM Classifier
 
 This approach does not train a local model. It sends the course description
 and the CNU knowledge base to an OpenRouter-compatible LLM and asks for CNU
@@ -110,6 +134,20 @@ Train the two DDC-based models:
 python ddc_classifier.py --train --model-type logreg
 python ddc_classifier.py --train --model-type mlp
 ```
+
+Run a small XLM-RoBERTa smoke test:
+
+```bash
+python transformer_ddc_classifier.py --eval --max-samples 5000
+```
+
+Train and save the XLM-RoBERTa model:
+
+```bash
+python transformer_ddc_classifier.py --train
+```
+
+On Apple Silicon, the script automatically uses `mps` when PyTorch supports it.
 
 Run a prediction with a trained DDC model:
 
@@ -155,22 +193,26 @@ The DDC comparison command prints a compact table:
 
 ```text
 EVALUATION SUMMARY
-Model      DDC Micro F1   CNU Micro F1   CNU Subset Accuracy
---------   ------------   ------------   -------------------
+Model      DDC Top-1 Acc   DDC Top-3 Acc   Mapped CNU Micro F1
+--------   -------------   -------------   -------------------
 Random     ...
 Majority   ...
 LogReg     ...
 MLP        ...
 ```
 
-Latest full 80/20 evaluation on `theses_labeled.csv`:
+Full 80/20 evaluation on `theses_labeled.csv`:
 
-| Model | DDC Micro F1 | CNU Micro F1 | CNU Subset Accuracy |
+| Model | DDC Top-1 Acc | DDC Top-3 Acc | Mapped CNU Micro F1 |
 |---|---:|---:|---:|
-| Random | 0.0112 | 0.0257 | 2.23% |
-| Majority | 0.1229 | 0.1247 | 13.73% |
-| LogReg | 0.6270 | 0.6650 | 60.05% |
-| MLP | 0.5225 | 0.5663 | 50.99% |
+| Random | 1.12% | 1.12% | 0.0257 |
+| Majority | 12.29% | 12.29% | 0.1247 |
+| LogReg | 62.72% | 89.13% | 0.6650 |
+| MLP | 52.21% | 77.27% | 0.5663 |
+
+The XLM-RoBERTa Transformer route has been added as an additional experiment.
+Run `python transformer_ddc_classifier.py --eval` to generate its row with the
+same metrics.
 
 Evaluation setup:
 
@@ -186,11 +228,14 @@ space. The Majority baseline always predicts the most frequent DDC code in the
 training split. Both are mapped through the same DDC-to-CNU table as LogReg and
 MLP.
 
-These metrics are used because the task is multi-label:
+These metrics are used because DDC is the real supervised target and CNU is a
+mapped output:
 
-- `DDC Micro F1`: quality of the intermediate DDC prediction step.
-- `CNU Micro F1`: main final-task metric after DDC-to-CNU mapping.
-- `CNU Subset Accuracy`: strict exact-match score for the full CNU label set.
+- `DDC Top-1 Acc`: whether the highest-scoring DDC candidate is correct.
+- `DDC Top-3 Acc`: whether the true DDC appears among the three highest-scoring
+  candidates.
+- `Mapped CNU Micro F1`: proxy downstream score after applying the
+  DDC-to-CNU mapping to predicted and source DDC codes.
 
 ## Data Workflow
 
@@ -236,6 +281,7 @@ raw.csv
 theses_labeled.csv
 ddc_model_logreg.pkl
 ddc_model_mlp.pkl
+ddc_model_xlm_roberta.pt
 .env
 ```
 
@@ -243,3 +289,5 @@ ddc_model_mlp.pkl
 
 See `USAGE_GUIDE.md` for detailed commands and workflow explanations.
 See `DATA_PROVENANCE.md` for data-source notes.
+See `DATASET_STATISTICS.md` for dataset-distribution statistics.
+See `SHORT_REPORT_EN.md` and `SHORT_REPORT_ZH.md` for the current short report drafts.

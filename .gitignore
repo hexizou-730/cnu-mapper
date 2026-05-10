@@ -14,6 +14,9 @@ theses_labeled.csv
 
 # Trained model artifacts
 *.pkl
+*.pt
+*.pth
+*.safetensors
 
 # Logs and evaluation outputs
 *.log

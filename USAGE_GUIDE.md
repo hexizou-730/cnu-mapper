@@ -29,6 +29,7 @@ Main files:
 
 ```text
 ddc_classifier.py
+transformer_ddc_classifier.py
 llm_classifier.py
 dewey_to_cnu.py
 label_theses.py
@@ -47,6 +48,7 @@ raw.csv
 theses_labeled.csv
 ddc_model_logreg.pkl
 ddc_model_mlp.pkl
+ddc_model_xlm_roberta.pt
 ```
 
 These generated files are not meant to be committed to GitHub by default.
@@ -194,8 +196,8 @@ Expected final output:
 
 ```text
 EVALUATION SUMMARY
-Model      DDC Micro F1   CNU Micro F1   CNU Subset Accuracy
---------   ------------   ------------   -------------------
+Model      DDC Top-1 Acc   DDC Top-3 Acc   Mapped CNU Micro F1
+--------   -------------   -------------   -------------------
 Random     ...
 Majority   ...
 LogReg     ...
@@ -205,7 +207,105 @@ MLP        ...
 Important: `--eval` and `--compare` train temporary models for fair evaluation.
 They do not load the final `.pkl` files created by `--train`.
 
-## 6. LLM Classifier
+## 6. Transformer DDC Classifier
+
+The Transformer classifier uses PyTorch and Hugging Face Transformers:
+
+```text
+abstract -> xlm-roberta-base -> DDC prediction -> DDC-to-CNU mapping -> CNU sections
+```
+
+It predicts DDC first, not CNU directly. The final CNU labels are produced by
+the same `dewey_to_cnu.py` mapping used by LogReg and MLP.
+
+### 6.1 Quick smoke test
+
+Use a small sample first. This downloads `xlm-roberta-base` the first time it
+runs.
+
+```bash
+python transformer_ddc_classifier.py --eval --max-samples 5000
+```
+
+Expected final output:
+
+```text
+EVALUATION SUMMARY
+Model      DDC Top-1 Acc   DDC Top-3 Acc   Mapped CNU Micro F1
+--------   -------------   -------------   -------------------
+XLM-R      ...
+```
+
+### 6.2 Use Apple Silicon GPU
+
+The default device is `auto`. On an M-series Mac, PyTorch uses `mps` when it is
+available.
+
+```bash
+python transformer_ddc_classifier.py --eval --max-samples 5000 --device auto
+```
+
+You can force a device:
+
+```bash
+python transformer_ddc_classifier.py --eval --max-samples 5000 --device mps
+python transformer_ddc_classifier.py --eval --max-samples 5000 --device cpu
+```
+
+If MPS memory is tight, reduce the batch size:
+
+```bash
+python transformer_ddc_classifier.py --eval --max-samples 5000 --batch-size 4
+```
+
+### 6.3 Train and save the Transformer model
+
+```bash
+python transformer_ddc_classifier.py --train
+```
+
+The trained checkpoint is saved as:
+
+```text
+ddc_model_xlm_roberta.pt
+```
+
+For a first practical run on a laptop, use fewer samples:
+
+```bash
+python transformer_ddc_classifier.py --train --max-samples 20000 --epochs 1 --batch-size 8
+```
+
+### 6.4 Predict with the trained Transformer model
+
+```bash
+python transformer_ddc_classifier.py \
+  "Ce cours introduit l'apprentissage automatique, les reseaux de neurones et la fouille de donnees."
+```
+
+### 6.5 Compare with LogReg and MLP
+
+Run the sklearn comparison:
+
+```bash
+python ddc_classifier.py --compare
+```
+
+Then run the Transformer evaluation:
+
+```bash
+python transformer_ddc_classifier.py --eval
+```
+
+Both commands print the same metric columns:
+
+```text
+DDC Top-1 Accuracy
+DDC Top-3 Accuracy
+Mapped CNU Micro F1
+```
+
+## 7. LLM Classifier
 
 The LLM classifier directly predicts CNU sections from a course description.
 
@@ -213,7 +313,7 @@ The LLM classifier directly predicts CNU sections from a course description.
 course description -> prompt -> CNU sections
 ```
 
-### 6.1 Configure OpenRouter
+### 7.1 Configure OpenRouter
 
 Create a `.env` file:
 
@@ -221,7 +321,7 @@ Create a `.env` file:
 echo 'OPENROUTER_API_KEY=sk-or-v1-your-key' > .env
 ```
 
-### 6.2 One-shot prediction
+### 7.2 One-shot prediction
 
 ```bash
 python llm_classifier.py "This course covers machine learning and neural networks."
@@ -236,7 +336,7 @@ Prediction:
   27  Computer science
 ```
 
-### 6.3 Interactive mode
+### 7.3 Interactive mode
 
 ```bash
 python llm_classifier.py
@@ -252,13 +352,13 @@ quit
 Ctrl-D
 ```
 
-### 6.4 Change the LLM model
+### 7.4 Change the LLM model
 
 ```bash
 python llm_classifier.py "description..." --model google/gemini-2.5-flash-lite
 ```
 
-### 6.5 Preview the prompt
+### 7.5 Preview the prompt
 
 ```bash
 python llm_classifier.py --dry-run
@@ -266,31 +366,38 @@ python llm_classifier.py --dry-run
 
 This prints the full system prompt without calling the API.
 
-## 7. Metrics
+## 8. Metrics
 
 The project reports three main metrics for the DDC-based models:
 
 ```text
-DDC Micro F1
-CNU Micro F1
-CNU Subset Accuracy
+DDC Top-1 Accuracy
+DDC Top-3 Accuracy
+Mapped CNU Micro F1
 ```
 
-### DDC Micro F1
+### DDC Top-1 Accuracy
 
-Measures the quality of the intermediate DDC prediction step.
+Measures whether the highest-scoring DDC candidate is correct. This is close to
+ordinary classification accuracy in the current single-DDC preprocessing setup.
 
-### CNU Micro F1
+### DDC Top-3 Accuracy
 
-Measures the final CNU prediction quality after DDC-to-CNU mapping. This is
-the main metric for comparing the classical-ML methods.
+Measures whether the true DDC appears among the three highest-scoring DDC
+candidates. This is useful because nearby DDC categories can be semantically
+close, and the prediction logic already considers the top three candidates.
 
-### CNU Subset Accuracy
+### Mapped CNU Micro F1
 
-Measures exact-match accuracy for the full predicted CNU label set. It is
-stricter than Micro F1 because every predicted label must match the true set.
+Measures the downstream CNU result after both source DDC codes and predicted
+DDC codes are mapped through `dewey_to_cnu.py`. This is a proxy metric, not a
+direct evaluation against manually annotated CNU labels.
 
-## 8. Suggested Experiment Workflow
+Important: the source dataset contains DDC metadata, but it does not contain
+expert CNU annotations. CNU metrics should therefore be interpreted as mapped
+proxy metrics.
+
+## 9. Suggested Experiment Workflow
 
 Use this sequence when preparing results:
 
@@ -303,16 +410,21 @@ python ddc_classifier.py --compare --max-samples 5000
 # Full evaluation table
 python ddc_classifier.py --compare | tee eval_compare.txt
 
+# Optional Transformer evaluation
+python transformer_ddc_classifier.py --eval --max-samples 5000 | tee eval_xlm_roberta.txt
+
 # Train final local models
 python ddc_classifier.py --train --model-type logreg
 python ddc_classifier.py --train --model-type mlp
+python transformer_ddc_classifier.py --train --max-samples 20000 --epochs 1
 
 # Test trained models on examples
 python ddc_classifier.py --model-type logreg "Ce cours introduit l'apprentissage automatique et les reseaux de neurones."
 python ddc_classifier.py --model-type mlp "Ce cours porte sur la chimie organique et la catalyse."
+python transformer_ddc_classifier.py "Ce cours introduit l'apprentissage automatique et les reseaux de neurones."
 ```
 
-## 9. Example Inputs
+## 10. Example Inputs
 
 Computer science:
 
@@ -342,7 +454,7 @@ python ddc_classifier.py --model-type logreg \
   "Ce cours introduit la phonetique, la syntaxe, la semantique, la morphologie et la variation linguistique."
 ```
 
-## 10. GitHub Notes
+## 11. GitHub Notes
 
 The following files should not be committed to a normal GitHub repository:
 
@@ -351,6 +463,7 @@ raw.csv
 theses_labeled.csv
 ddc_model_logreg.pkl
 ddc_model_mlp.pkl
+ddc_model_xlm_roberta.pt
 .env
 __pycache__/
 ```
@@ -358,14 +471,14 @@ __pycache__/
 Reasons:
 
 - `raw.csv` and `theses_labeled.csv` are large generated data files.
-- `.pkl` files are generated trained models.
+- `.pkl` and `.pt` files are generated trained models.
 - `.env` contains a private API key.
 - `__pycache__/` contains Python cache files.
 
 If you want to publish data or trained models, use Git LFS, a release asset, or
 an external storage service.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### `conda not found`
 

@@ -40,10 +40,7 @@ from pathlib import Path
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-)
+from sklearn.metrics import f1_score
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import MultiLabelBinarizer
@@ -285,6 +282,34 @@ def ddc_binary_to_cnu_binary(
     return cnu_mlb.transform(cnu_rows)
 
 
+def ddc_top_k_accuracy_from_proba(
+    proba: np.ndarray,
+    y_ddc_true: np.ndarray,
+    k: int,
+) -> float:
+    """Return whether each sample's true DDC appears in the top-k scores.
+
+    The source dataset is effectively single-DDC in the current preprocessing
+    setup, but this implementation also handles multi-DDC rows by counting a
+    sample as correct when any true DDC label appears in the top-k candidates.
+    """
+    hits = 0
+    for i in range(proba.shape[0]):
+        ranked = np.argsort(-proba[i])[:k]
+        if y_ddc_true[i, ranked].any():
+            hits += 1
+    return hits / max(proba.shape[0], 1)
+
+
+def ddc_candidate_hit_accuracy(
+    y_ddc_pred: np.ndarray,
+    y_ddc_true: np.ndarray,
+) -> float:
+    """Return candidate-hit accuracy for predictors without ranked scores."""
+    hits = ((y_ddc_pred & y_ddc_true).sum(axis=1) > 0).sum()
+    return float(hits / max(y_ddc_pred.shape[0], 1))
+
+
 def predict_one(text: str, vectorizer, clf, ddc_mlb, threshold: float) -> tuple[list[str], list[str]]:
     """Predict DDC and mapped CNU codes for one free-text description."""
     x = vectorizer.transform([text])
@@ -305,14 +330,21 @@ def compute_metrics_from_ddc_binary(
     ddc_mlb: MultiLabelBinarizer,
     cnu_mlb: MultiLabelBinarizer,
     threshold: float | None = None,
+    ddc_top1_accuracy: float | None = None,
+    ddc_top3_accuracy: float | None = None,
 ) -> dict[str, float | str]:
     """Compute the compact report row from DDC predictions.
 
-    DDC predictions are always scored directly, then mapped into CNU space for
-    final-task metrics. This shared function keeps trained models and simple
-    baselines comparable.
+    The source dataset contains DDC metadata, not expert CNU annotations.
+    Therefore DDC top-k accuracies are the primary supervised metrics. Mapped
+    CNU Micro F1 is reported only after applying the rule-based DDC-to-CNU
+    mapping, so it should be interpreted as a proxy metric.
     """
     y_cnu_pred = ddc_binary_to_cnu_binary(y_ddc_pred, ddc_mlb.classes_, cnu_mlb)
+    if ddc_top1_accuracy is None:
+        ddc_top1_accuracy = ddc_candidate_hit_accuracy(y_ddc_pred, y_ddc_true)
+    if ddc_top3_accuracy is None:
+        ddc_top3_accuracy = ddc_candidate_hit_accuracy(y_ddc_pred, y_ddc_true)
 
     return {
         "model": model_name,
@@ -322,7 +354,8 @@ def compute_metrics_from_ddc_binary(
         "cnu_micro_f1": f1_score(
             y_cnu_true, y_cnu_pred, average="micro", zero_division=0
         ),
-        "cnu_subset_accuracy": accuracy_score(y_cnu_true, y_cnu_pred),
+        "ddc_top1_accuracy": ddc_top1_accuracy,
+        "ddc_top3_accuracy": ddc_top3_accuracy,
         "threshold": threshold if threshold is not None else "",
     }
 
@@ -341,21 +374,23 @@ def compute_report_metrics(
     model_name = "LogReg" if model_type == "logreg" else "MLP"
     return compute_metrics_from_ddc_binary(
         model_name, y_ddc_pred, y_ddc_true, y_cnu_true,
-        ddc_mlb, cnu_mlb, threshold
+        ddc_mlb, cnu_mlb, threshold,
+        ddc_top1_accuracy=ddc_top_k_accuracy_from_proba(proba, y_ddc_true, 1),
+        ddc_top3_accuracy=ddc_top_k_accuracy_from_proba(proba, y_ddc_true, 3),
     )
 
 
 def print_report_table(rows: list[dict[str, float | str]]) -> None:
     """Print the compact evaluation table used in README and CLI output."""
     print("\nEVALUATION SUMMARY")
-    print("Model      DDC Micro F1   CNU Micro F1   CNU Subset Accuracy")
-    print("--------   ------------   ------------   -------------------")
+    print("Model      DDC Top-1 Acc   DDC Top-3 Acc   Mapped CNU Micro F1")
+    print("--------   -------------   -------------   -------------------")
     for row in rows:
         print(
             f"{row['model']:<8}   "
-            f"{row['ddc_micro_f1']:.4f}         "
-            f"{row['cnu_micro_f1']:.4f}         "
-            f"{row['cnu_subset_accuracy'] * 100:6.2f}%"
+            f"{row['ddc_top1_accuracy'] * 100:6.2f}%        "
+            f"{row['ddc_top3_accuracy'] * 100:6.2f}%        "
+            f"{row['cnu_micro_f1']:.4f}"
         )
 
 
