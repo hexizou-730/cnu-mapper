@@ -135,9 +135,14 @@ The project also includes a PyTorch/Transformers route based on
 `xlm-roberta-base`. This model predicts DDC codes first and then uses the same
 DDC-to-CNU mapping as the classical machine-learning models.
 
-This approach is useful for future deep-learning experiments, but the most
-stable full evaluation table in this report currently focuses on the Random,
-Majority, Logistic Regression, and MLP methods.
+The model uses the XLM-R encoder, the representation of the first token, a
+dropout layer, and a linear multi-label DDC classification head. It is trained
+with `BCEWithLogitsLoss`, then sigmoid probabilities are converted into DDC
+predictions using the same threshold and Top-K fallback logic as the other DDC
+models.
+
+The completed full-data evaluation used one epoch, `batch-size=16`,
+`max-length=256`, and Apple Silicon MPS acceleration.
 
 ### 4.6 LLM Classifier
 
@@ -161,6 +166,11 @@ For the full evaluation:
 - Fit split for trainable models: 212,228 samples
 - Validation split for threshold tuning: 53,058 samples
 - Test split: 66,322 samples
+- XLM-R evaluation setting: 1 epoch, batch size 16, max length 256
+- XLM-R training time on Apple Silicon MPS: 39,541.8 seconds, about 10.98 hours
+- XLM-R final training loss: 0.0298
+- XLM-R calibrated threshold: 0.325
+- XLM-R validation DDC micro-F1: 0.6186
 
 The reported metrics are:
 
@@ -181,16 +191,23 @@ evaluation against manually annotated CNU ground truth.
 | Majority | 12.29% | 12.29% | 0.1247 |
 | LogReg | 62.72% | 89.13% | 0.6650 |
 | MLP | 52.21% | 77.27% | 0.5663 |
+| XLM-R | 60.95% | 87.66% | 0.6542 |
 
 The Logistic Regression model performs best among the evaluated approaches. It
 substantially improves over both simple baselines, which indicates that the
 model learns meaningful disciplinary signals from the abstracts.
 
-The MLP also improves over the simple baselines, but it performs worse than the
-Logistic Regression model. One possible explanation is that sparse TF-IDF text
-features are well suited to linear classifiers. The MLP is more complex, but it
-does not necessarily benefit from the high-dimensional sparse representation
-used here.
+The XLM-RoBERTa model is close to Logistic Regression and clearly better than
+the MLP on all three reported metrics. However, it does not surpass Logistic
+Regression in the current setup. One likely reason is that the Transformer
+model only reads the first 256 subword tokens, while TF-IDF uses information
+from the full abstract. Sparse TF-IDF features are also very effective for this
+metadata-derived DDC classification task.
+
+The MLP also improves over the simple baselines, but it performs worse than
+both Logistic Regression and XLM-RoBERTa. The result suggests that adding model
+complexity alone is not enough when the input representation remains sparse
+TF-IDF.
 
 ## 7. Discussion and Limitations
 
@@ -203,6 +220,11 @@ The dataset is also imbalanced. Some mapped CNU sections have tens of thousands
 of examples, while others are rare or absent. This affects both model training
 and the interpretation of aggregate metrics.
 
+For the Transformer model, the largest modeling limitation is input truncation:
+`max-length=256` means that later parts of long abstracts are not visible to the
+model. This may partly explain why XLM-RoBERTa is close to, but still below,
+the Logistic Regression baseline.
+
 Finally, only 45 of the 80 official CNU sections are represented in the current
 training data. The current supervised models cannot learn sections that never
 appear in the weak labels.
@@ -214,5 +236,5 @@ Possible next steps include:
 - Refine the DDC-to-CNU mapping for ambiguous DDC codes.
 - Add more detailed per-class evaluation, especially for rare CNU sections.
 - Evaluate the LLM classifier on a smaller manually selected test set.
-- Continue transformer-based experiments if more training resources are available.
+- Continue transformer-based experiments with longer text handling.
 - Expand the final report with examples of correct and incorrect predictions.

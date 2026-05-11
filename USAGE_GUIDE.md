@@ -305,6 +305,24 @@ DDC Top-3 Accuracy
 Mapped CNU Micro F1
 ```
 
+The latest full XLM-R evaluation was run with:
+
+```bash
+python transformer_ddc_classifier.py --eval --device mps --batch-size 16 --max-length 256
+```
+
+Result:
+
+```text
+Model      DDC Top-1 Acc   DDC Top-3 Acc   Mapped CNU Micro F1
+--------   -------------   -------------   -------------------
+XLM-R       60.95%         87.66%        0.6542
+```
+
+This run used one epoch, a calibrated threshold of `0.325`, a validation DDC
+micro-F1 of `0.6186`, and a training time of about 10.98 hours on Apple Silicon
+MPS.
+
 ## 7. LLM Classifier
 
 The LLM classifier directly predicts CNU sections from a course description.

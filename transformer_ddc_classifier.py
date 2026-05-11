@@ -5,7 +5,8 @@ transformer_ddc_classifier.py
 DDC-first classifier based on a pretrained Transformer model.
 
 This script adds a PyTorch/Transformers route to the existing project without
-replacing the TF-IDF + LogReg / MLP baselines in ddc_classifier.py.
+replacing the TF-IDF + LogReg / MLP baselines in ddc_classifier.py. It is meant
+to be a comparable deep-learning experiment, not a separate CNU-only pipeline.
 
 Pipeline:
 
@@ -13,7 +14,9 @@ Pipeline:
 
 The model predicts DDC codes, not CNU codes directly. Final CNU labels and
 metrics are produced through the same dewey_to_cnu.py mapping and the same
-threshold + Top-K logic used by the sklearn baselines.
+threshold + Top-K logic used by the sklearn baselines. This matters because the
+source dataset contains DDC metadata, while CNU labels are weak labels derived
+from the mapping table.
 
 Usage:
     python transformer_ddc_classifier.py --eval --max-samples 5000
@@ -95,7 +98,12 @@ def seed_everything(seed: int) -> None:
 
 
 class TextDDCDataset(Dataset):
-    """Small dataset wrapper holding raw texts and multi-label DDC targets."""
+    """Dataset wrapper holding raw texts and optional multi-label DDC targets.
+
+    Tokenization is intentionally kept out of `__getitem__`. The collate
+    function tokenizes a full batch at once, which is simpler and usually
+    faster than tokenizing one row at a time.
+    """
 
     def __init__(self, texts: list[str], labels: np.ndarray | None = None):
         self.texts = texts
@@ -112,7 +120,13 @@ class TextDDCDataset(Dataset):
 
 
 def make_collate_fn(tokenizer, max_length: int):
-    """Create a DataLoader collator that tokenizes each text batch."""
+    """Create a DataLoader collator that tokenizes each text batch.
+
+    The Transformer only sees the first `max_length` subword tokens. In the
+    current experiments this is 256, so long abstracts are truncated. This is
+    an important limitation when comparing XLM-R against TF-IDF, because TF-IDF
+    can use tokens from the full abstract.
+    """
 
     def collate(batch: list[dict]) -> dict[str, torch.Tensor]:
         texts = [item["text"] for item in batch]
@@ -134,7 +148,12 @@ def make_collate_fn(tokenizer, max_length: int):
 
 
 class TransformerDDCClassifier(nn.Module):
-    """Pretrained encoder plus a multi-label DDC classification head."""
+    """Pretrained encoder plus a multi-label DDC classification head.
+
+    XLM-RoBERTa returns contextual token representations. We use the first token
+    as a compact representation of the whole abstract and feed it into one
+    linear layer with one output per DDC class.
+    """
 
     def __init__(self, model_name: str, num_labels: int, dropout: float = 0.10):
         super().__init__()
@@ -145,6 +164,7 @@ class TransformerDDCClassifier(nn.Module):
 
     def forward(self, input_ids, attention_mask) -> torch.Tensor:
         output = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+        # The first token plays the same role as a CLS pooled representation.
         cls_token = output.last_hidden_state[:, 0]
         return self.classifier(self.dropout(cls_token))
 
@@ -175,7 +195,11 @@ def train_model(
     labels: np.ndarray,
     config: TrainConfig,
 ) -> None:
-    """Train the Transformer DDC classifier for the configured number of epochs."""
+    """Train the Transformer DDC classifier for the configured number of epochs.
+
+    The labels are multi-hot DDC vectors, so the loss is binary cross entropy
+    over all DDC classes instead of ordinary single-label cross entropy.
+    """
     dataset = TextDDCDataset(texts, labels)
     loader = DataLoader(
         dataset,
@@ -184,6 +208,9 @@ def train_model(
         collate_fn=make_collate_fn(tokenizer, config.max_length),
         num_workers=0,
     )
+    # BCEWithLogitsLoss combines a sigmoid layer and binary cross entropy in a
+    # numerically stable form. Each DDC class is treated as an independent
+    # yes/no target.
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(
         (p for p in model.parameters() if p.requires_grad),
@@ -235,7 +262,12 @@ def predict_probabilities(
     max_length: int,
     device: torch.device,
 ) -> np.ndarray:
-    """Return sigmoid probabilities for each DDC class."""
+    """Return sigmoid probabilities for each DDC class.
+
+    The returned matrix has shape `(n_samples, n_ddc_classes)`. Evaluation code
+    later uses the calibrated threshold for binary predictions and the raw
+    probabilities for Top-1 / Top-3 accuracy.
+    """
     dataset = TextDDCDataset(texts)
     loader = DataLoader(
         dataset,
@@ -278,7 +310,12 @@ def save_checkpoint(
     threshold: float,
     config: TrainConfig,
 ) -> None:
-    """Save the trained model and the label metadata needed for prediction."""
+    """Save the trained model and the label metadata needed for prediction.
+
+    The checkpoint stores DDC class names and the calibrated threshold. Without
+    those metadata fields, a loaded model would not know which output index
+    corresponds to which DDC code.
+    """
     torch.save(
         {
             "model_name": config.model_name,
@@ -328,7 +365,12 @@ def build_config(args) -> TrainConfig:
 
 
 def step_eval(args) -> None:
-    """Train and evaluate XLM-R on the shared 80/20 split."""
+    """Train and evaluate XLM-R on the shared 80/20 split.
+
+    This is the command to use for numbers that should be compared with LogReg
+    and MLP. It trains on the fit split, tunes the threshold on the validation
+    split, and reports final metrics on the held-out test split.
+    """
     seed_everything(RANDOM_SEED)
     config = build_config(args)
 
@@ -343,6 +385,8 @@ def step_eval(args) -> None:
     print(f"   Max length: {config.max_length}")
     print(f"   Freeze encoder: {config.freeze_encoder}")
 
+    # Reuse the same deterministic split helper as ddc_classifier.py so that
+    # Transformer results are directly comparable to the classical baselines.
     _, fit_idx, val_idx, test_idx = make_train_test_split(len(texts))
     fit_texts = [texts[i] for i in fit_idx]
     fit_ddc = [ddc_labels[i] for i in fit_idx]
@@ -362,6 +406,9 @@ def step_eval(args) -> None:
     y_val = ddc_mlb.transform(val_ddc).astype("float32")
     y_test = ddc_mlb.transform(test_ddc)
 
+    # CNU is evaluated after mapping source and predicted DDC codes into CNU
+    # space. This keeps the evaluation aligned with the DDC-first project
+    # design.
     cnu_mlb = MultiLabelBinarizer()
     cnu_mlb.fit(cnu_labels)
     y_cnu_test = cnu_mlb.transform(test_cnu)
@@ -382,6 +429,8 @@ def step_eval(args) -> None:
         model, tokenizer, val_texts, config.batch_size,
         config.max_length, config.device
     )
+    # The threshold is selected on validation DDC micro-F1, then reused on the
+    # test split. The test set is not used for threshold selection.
     threshold, val_micro_f1 = tune_threshold(val_proba, y_val)
     print(f"   Best threshold: {threshold:.3f}")
     print(f"   Validation DDC micro-F1: {val_micro_f1:.4f}")
@@ -401,7 +450,11 @@ def step_eval(args) -> None:
 
 
 def step_train(args) -> None:
-    """Train and save a reusable XLM-R DDC model checkpoint."""
+    """Train and save a reusable XLM-R DDC model checkpoint.
+
+    Unlike `step_eval`, this mode does not report held-out test metrics. It is
+    intended for producing a local model file for later single-text prediction.
+    """
     seed_everything(RANDOM_SEED)
     config = build_config(args)
 
@@ -466,6 +519,8 @@ def predict_one(args) -> None:
     y_pred = predict_binary_matrix(proba, threshold)
     ranked = np.argsort(-proba[0])
     selected = set(np.where(y_pred[0])[0])
+    # Keep predicted DDC codes ordered by model confidence. The threshold decides
+    # which labels are included; sorting makes the printed output easier to read.
     ddc_codes = [ddc_mlb.classes_[j] for j in ranked if j in selected]
     cnu_codes = ddc_to_cnu_codes(ddc_codes)
     by_code = load_kb()

@@ -201,6 +201,12 @@ LogReg     ...
 MLP        ...
 ```
 
+The Transformer evaluator prints the same columns for the XLM-RoBERTa route:
+
+```bash
+python transformer_ddc_classifier.py --eval --device mps --batch-size 16 --max-length 256
+```
+
 Full 80/20 evaluation on `theses_labeled.csv`:
 
 | Model | DDC Top-1 Acc | DDC Top-3 Acc | Mapped CNU Micro F1 |
@@ -209,10 +215,13 @@ Full 80/20 evaluation on `theses_labeled.csv`:
 | Majority | 12.29% | 12.29% | 0.1247 |
 | LogReg | 62.72% | 89.13% | 0.6650 |
 | MLP | 52.21% | 77.27% | 0.5663 |
+| XLM-R | 60.95% | 87.66% | 0.6542 |
 
-The XLM-RoBERTa Transformer route has been added as an additional experiment.
-Run `python transformer_ddc_classifier.py --eval` to generate its row with the
-same metrics.
+The XLM-RoBERTa row was produced with one full epoch on Apple Silicon MPS,
+`batch-size=16`, and `max-length=256`. The training stage took about 10.98
+hours and ended with training loss `0.0298`. It is clearly stronger than the
+MLP baseline, but the TF-IDF + Logistic Regression baseline remains the best
+method in the current full evaluation.
 
 Evaluation setup:
 
@@ -222,6 +231,8 @@ Evaluation setup:
 - Test split: 66,322 samples
 - LogReg calibrated threshold: 0.875
 - MLP calibrated threshold: 0.950
+- XLM-R calibrated threshold: 0.325
+- XLM-R validation DDC micro-F1: 0.6186
 
 The Random baseline uniformly samples one DDC code from the training label
 space. The Majority baseline always predicts the most frequent DDC code in the
