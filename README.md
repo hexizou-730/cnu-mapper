@@ -36,6 +36,7 @@ cnu_mapper/
 |-- label_theses.py                    # Build labeled training data from raw.csv
 |-- fetch_theses.py                    # Download / inspect / filter theses.fr data
 |-- cnu_knowledge_base_official.json   # Official CNU reference used by DDC and LLM output
+|-- rebuild_official_kb.py             # Rebuild the official CNU JSON from curated official lists
 |-- DATA_PROVENANCE.md                 # Data source notes
 |-- DATASET_STATISTICS.md              # Dataset size and label-distribution summary
 `-- USAGE_GUIDE.md                     # Detailed usage guide
@@ -266,6 +267,14 @@ The current labeling script keeps French abstracts with length between 100 and
 ```text
 theses_labeled.csv
 ```
+
+`rebuild_official_kb.py` is separate from the thesis CSV workflow. It does not
+download data, scrape websites, or read `raw.csv`. Instead, it contains manually
+curated official CNU section lists plus source URLs for verification, and it
+rewrites `cnu_knowledge_base_official.json` from those local lists. In short:
+`raw.csv` provides thesis abstracts and DDC metadata for training, while
+`cnu_knowledge_base_official.json` provides the official meaning of CNU section
+codes.
 
 ## Notes for GitHub
 
