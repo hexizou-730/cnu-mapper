@@ -38,8 +38,6 @@ cnu_mapper/
 |-- cnu_knowledge_base_official.json   # Official CNU reference used by DDC and LLM output
 |-- DATA_PROVENANCE.md                 # Data source notes
 |-- DATASET_STATISTICS.md              # Dataset size and label-distribution summary
-|-- SHORT_REPORT_EN.md                 # Short project report draft in English
-|-- SHORT_REPORT_ZH.md                 # Short project report draft in Chinese
 `-- USAGE_GUIDE.md                     # Detailed usage guide
 ```
 
@@ -301,4 +299,3 @@ ddc_model_xlm_roberta.pt
 See `USAGE_GUIDE.md` for detailed commands and workflow explanations.
 See `DATA_PROVENANCE.md` for data-source notes.
 See `DATASET_STATISTICS.md` for dataset-distribution statistics.
-See `SHORT_REPORT_EN.md` and `SHORT_REPORT_ZH.md` for the current short report drafts.

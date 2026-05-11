@@ -22,6 +22,10 @@ theses_labeled.csv
 *.log
 eval_*.txt
 
+# Local report drafts
+SHORT_REPORT_*.md
+Short_Report_*.docx
+
 # Archived local baselines
 old_baseline/
 
